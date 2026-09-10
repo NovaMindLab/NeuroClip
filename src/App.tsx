@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Navbar } from "./components/Navbar";
+import { AppLayout } from "./components/layout/AppLayout";
 import { VideoDropzone } from "./components/VideoDropzone";
 import { PipelineStepper } from "./components/PipelineStepper";
 import { TimelineWaveform } from "./components/TimelineWaveform";
@@ -7,8 +7,16 @@ import { HighlightList, HighlightItem } from "./components/HighlightList";
 import { CommentaryStudio, CommentaryData } from "./components/CommentaryStudio";
 import { ClipPlayerModal } from "./components/ClipPlayerModal";
 import { ArchitectureModal } from "./components/ArchitectureModal";
+import { MediaLibraryView } from "./components/media-library/MediaLibraryView";
+import { AppNavTab, MediaAssetItem } from "./types/library";
+import { Eye, FolderGit2, CheckCircle2, Zap, HardDrive, Sparkles } from "lucide-react";
 
 export const App: React.FC = () => {
+  // Navigation layout state
+  const [activeTab, setActiveTab] = useState<AppNavTab>("studio");
+  const [libraryCount, setLibraryCount] = useState<number>(3);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
   const [selectedVideoPath, setSelectedVideoPath] = useState<string | null>(
     "/samples/esports_final_championship_match.mp4"
   );
@@ -24,14 +32,14 @@ export const App: React.FC = () => {
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
   const [isPlayerModalOpen, setIsPlayerModalOpen] = useState(false);
 
-  // New states for Phase 2 & 3: 9:16 Aspect ratio, Personas, BGM, and Folder Watcher
-  const [isVertical, setIsVertical] = useState(true); // 默认 9:16 竖屏模式
+  // States for Phase 2 & 3: 9:16 Aspect ratio, Personas, BGM, and Folder Watcher
+  const [isVertical, setIsVertical] = useState(true);
   const [currentPersona, setCurrentPersona] = useState("esports");
   const [currentBgm, setCurrentBgm] = useState("trap");
-  const [hwEncoderName, setHwEncoderName] = useState("VideoToolbox (硬件加速)");
+  const [hwEncoderName, setHwEncoderName] = useState("VideoToolbox (Apple Silicon 硬件加速)");
   const [isWatcherActive, setIsWatcherActive] = useState(false);
 
-  // Initial highlight candidates based on multimodal fusion
+  // Initial highlight candidates
   const [highlights, setHighlights] = useState<HighlightItem[]>([
     {
       id: 1,
@@ -84,7 +92,7 @@ export const App: React.FC = () => {
           setHwEncoderName(status.hw_encoder);
         }
       } catch {
-        // Fallback in web/dev preview
+        // Fallback in web preview
       }
     })();
 
@@ -102,7 +110,6 @@ export const App: React.FC = () => {
 
   const selectedHighlight = highlights.find((h) => h.id === selectedHighlightId) || highlights[0];
 
-  // Commentary data for selected highlight
   const [commentaryMap, setCommentaryMap] = useState<Record<number, CommentaryData>>({
     1: {
       hook: "千万别眨眼！这波决胜神级操作直接把全场看傻了！",
@@ -123,9 +130,9 @@ export const App: React.FC = () => {
       full_commentary:
         "注意看！谁能想到原本死局的对线，竟埋下了惊天伏笔！就在所有人都以为局势已定时，关键细节悄然逆转，呼吸之间胜负彻底颠覆，让人不得不倒吸一口凉气！这绝对是不可多得的名场面！",
       duration_seconds: 30.0,
-      char_count: 114,
+      char_count: 120,
       subtitles: [
-        { start_sec: 0.0, end_sec: 3.0, text: "注意看！谁能想到原本死局的对线，竟埋下惊天伏笔" },
+        { start_sec: 0.0, end_sec: 3.0, text: "注意看！谁能想到原本死局的对线，竟埋下了惊天伏笔" },
         { start_sec: 3.0, end_sec: 11.2, text: "就在所有人都以为局势已定时" },
         { start_sec: 11.2, end_sec: 18.5, text: "关键细节悄然逆转" },
         { start_sec: 18.5, end_sec: 24.2, text: "呼吸之间胜负彻底颠覆，让人不得不倒吸一口凉气" },
@@ -226,73 +233,198 @@ export const App: React.FC = () => {
     }));
   };
 
+  // 核心跨模块联动：从媒体库载入工作台并切换视图
+  const handleLoadAssetIntoStudio = (asset: MediaAssetItem) => {
+    setSelectedVideoPath(asset.fullPath);
+    setSelectedVideoName(asset.name);
+    setActiveTab("studio");
+    setToastMessage(`已将《${asset.name}》载入高光工作台，准备开始自动化切片！`);
+
+    setTimeout(() => {
+      setToastMessage(null);
+    }, 4000);
+  };
+
   return (
-    <div className="flex flex-col h-screen bg-[#0a0c10] text-slate-100 overflow-hidden font-sans">
-      {/* Top Navbar with Hardware Status & Watcher Toggle */}
-      <Navbar
-        ffmpegReady={true}
-        hwEncoderName={hwEncoderName}
-        isWatcherActive={isWatcherActive}
-        onToggleWatcher={handleToggleWatcher}
-        onOpenInfoModal={() => setIsInfoModalOpen(true)}
-      />
+    <AppLayout
+      activeTab={activeTab}
+      onSelectTab={setActiveTab}
+      hwEncoderName={hwEncoderName}
+      isWatcherActive={isWatcherActive}
+      onToggleWatcher={handleToggleWatcher}
+      ffmpegReady={true}
+      onOpenInfoModal={() => setIsInfoModalOpen(true)}
+      libraryCount={libraryCount}
+    >
+      {/* 全局 Toast 通知 */}
+      {toastMessage && (
+        <div className="fixed top-20 right-8 z-50 flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-cyan-950/90 border border-cyan-400 text-cyan-200 text-xs font-semibold shadow-2xl shadow-cyan-500/30 backdrop-blur-md animate-bounce">
+          <Sparkles className="w-4 h-4 text-amber-300" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
 
-      {/* Main Workspace Scroll Area */}
-      <main className="flex-1 overflow-y-auto p-6 space-y-5">
-        {/* Top Dropzone with 9:16 vs 16:9 Switcher */}
-        <VideoDropzone
-          selectedVideoPath={selectedVideoPath}
-          selectedVideoName={selectedVideoName}
-          onVideoSelected={(p, n) => {
-            setSelectedVideoPath(p);
-            setSelectedVideoName(n);
-          }}
-          isProcessing={isProcessing}
-          onStartProcess={handleStartProcess}
-          isVertical={isVertical}
-          onToggleAspect={(v) => setIsVertical(v)}
-        />
+      {/* 视图 1：高光剪辑工作台 (Studio) */}
+      {activeTab === "studio" && (
+        <div className="space-y-5 max-w-[1600px] mx-auto pb-10">
+          {/* Top Dropzone with 9:16 vs 16:9 Switcher */}
+          <VideoDropzone
+            selectedVideoPath={selectedVideoPath}
+            selectedVideoName={selectedVideoName}
+            onVideoSelected={(p, n) => {
+              setSelectedVideoPath(p);
+              setSelectedVideoName(n);
+            }}
+            isProcessing={isProcessing}
+            onStartProcess={handleStartProcess}
+            isVertical={isVertical}
+            onToggleAspect={(v) => setIsVertical(v)}
+          />
 
-        {/* 5-Step Pipeline Stepper */}
-        <PipelineStepper
-          currentStep={currentStep}
-          progress={progress}
-          statusMessage={statusMessage}
-        />
+          {/* 5-Step Pipeline Stepper */}
+          <PipelineStepper
+            currentStep={currentStep}
+            progress={progress}
+            statusMessage={statusMessage}
+          />
 
-        {/* Multimodal Timeline & Waveform */}
-        <TimelineWaveform
-          totalDuration={180.0}
-          rmsCurve={rmsCurve}
-          selectedStart={selectedHighlight.start_time}
-          selectedEnd={selectedHighlight.end_time}
-        />
+          {/* Multimodal Timeline & Waveform */}
+          <TimelineWaveform
+            totalDuration={180.0}
+            rmsCurve={rmsCurve}
+            selectedStart={selectedHighlight.start_time}
+            selectedEnd={selectedHighlight.end_time}
+          />
 
-        {/* Dual-Column Interactive Studio */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 pb-8">
-          <div className="lg:col-span-5">
-            <HighlightList
-              highlights={highlights}
-              selectedId={selectedHighlightId}
-              onSelectHighlight={(id) => setSelectedHighlightId(id)}
-            />
-          </div>
+          {/* Dual-Column Interactive Studio */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+            <div className="lg:col-span-5">
+              <HighlightList
+                highlights={highlights}
+                selectedId={selectedHighlightId}
+                onSelectHighlight={(id) => setSelectedHighlightId(id)}
+              />
+            </div>
 
-          <div className="lg:col-span-7">
-            <CommentaryStudio
-              data={currentCommentary}
-              onUpdateCommentary={handleUpdateCommentaryText}
-              onPreviewTts={() => {}}
-              onRegenerate={() => {}}
-              onOpenPlayer={() => setIsPlayerModalOpen(true)}
-              currentPersona={currentPersona}
-              onChangePersona={(p) => setCurrentPersona(p)}
-              currentBgm={currentBgm}
-              onChangeBgm={(b) => setCurrentBgm(b)}
-            />
+            <div className="lg:col-span-7">
+              <CommentaryStudio
+                data={currentCommentary}
+                onUpdateCommentary={handleUpdateCommentaryText}
+                onPreviewTts={() => {}}
+                onRegenerate={() => {}}
+                onOpenPlayer={() => setIsPlayerModalOpen(true)}
+                currentPersona={currentPersona}
+                onChangePersona={(p) => setCurrentPersona(p)}
+                currentBgm={currentBgm}
+                onChangeBgm={(b) => setCurrentBgm(b)}
+              />
+            </div>
           </div>
         </div>
-      </main>
+      )}
+
+      {/* 视图 2：PC 本地视频资产库 (Media Library) */}
+      {activeTab === "library" && (
+        <MediaLibraryView
+          onLoadIntoStudio={handleLoadAssetIntoStudio}
+          onUpdateCount={setLibraryCount}
+        />
+      )}
+
+      {/* 视图 3：无人值守监听中台 (Watcher) */}
+      {activeTab === "watcher" && (
+        <div className="space-y-6 max-w-[1200px] mx-auto pb-10">
+          <div className="p-6 rounded-2xl bg-[#121622] border border-[#1e2433] shadow-xl space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                  isWatcherActive ? "bg-emerald-950/80 border border-emerald-500/40 text-emerald-400" : "bg-slate-900 border border-slate-700 text-slate-400"
+                }`}>
+                  <Eye className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-bold text-white">无人值守守护进程控制台</h2>
+                  <p className="text-xs text-slate-400">基于 Rust notify 跨平台监听，连续3次稳定探测防写入锁冲突</p>
+                </div>
+              </div>
+
+              <button
+                onClick={handleToggleWatcher}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-lg ${
+                  isWatcherActive
+                    ? "bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-500/20"
+                    : "bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700"
+                }`}
+              >
+                {isWatcherActive ? "暂停监听服务" : "启动无人值守监听"}
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-slate-800">
+              <div className="p-4 rounded-xl bg-[#0a0c10] border border-slate-800">
+                <div className="text-xs text-slate-400 mb-1 flex items-center gap-1.5">
+                  <FolderGit2 className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>监控输入目录 (Watch Input)</span>
+                </div>
+                <div className="font-mono text-xs text-slate-200">./watch_input</div>
+              </div>
+
+              <div className="p-4 rounded-xl bg-[#0a0c10] border border-slate-800">
+                <div className="text-xs text-slate-400 mb-1 flex items-center gap-1.5">
+                  <HardDrive className="w-3.5 h-3.5 text-purple-400" />
+                  <span>自动化成品导出目录 (Exports)</span>
+                </div>
+                <div className="font-mono text-xs text-slate-200">./neuroclip_exports</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 视图 4：系统与硬件配置 (Settings) */}
+      {activeTab === "settings" && (
+        <div className="space-y-6 max-w-[1200px] mx-auto pb-10">
+          <div className="p-6 rounded-2xl bg-[#121622] border border-[#1e2433] shadow-xl space-y-4">
+            <h2 className="text-sm font-bold text-white flex items-center gap-2">
+              <Zap className="w-4 h-4 text-amber-400" />
+              <span>硬件编解码加速环境</span>
+            </h2>
+            <div className="p-4 rounded-xl bg-[#0a0c10] border border-slate-800 flex items-center justify-between">
+              <div>
+                <div className="text-xs font-bold text-slate-200">{hwEncoderName}</div>
+                <div className="text-[11px] text-slate-400 mt-0.5">自适应嗅探 Apple Silicon VideoToolbox / NVIDIA NVENC / Intel QSV</div>
+              </div>
+              <span className="px-2.5 py-1 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-500/30 text-[11px] font-mono">
+                ACTIVE
+              </span>
+            </div>
+
+            <h2 className="text-sm font-bold text-white flex items-center gap-2 pt-4">
+              <CheckCircle2 className="w-4 h-4 text-cyan-400" />
+              <span>端侧轻量多模态引擎体系</span>
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="p-4 rounded-xl bg-[#0a0c10] border border-slate-800 space-y-1">
+                <div className="text-xs font-bold text-cyan-400">TransNetV2</div>
+                <div className="text-[11px] text-slate-400">镜头边缘智能吸附 (3.0s 黄金半径)</div>
+                <div className="text-[10px] text-emerald-400 font-mono">状态: 就绪 (0ms 延迟)</div>
+              </div>
+
+              <div className="p-4 rounded-xl bg-[#0a0c10] border border-slate-800 space-y-1">
+                <div className="text-xs font-bold text-purple-400">YAMNet & RMS</div>
+                <div className="text-[11px] text-slate-400">分贝突增 2.5x 爆点挖掘与情绪声效分类</div>
+                <div className="text-[10px] text-emerald-400 font-mono">状态: 就绪 (纯 Rust 滑窗)</div>
+              </div>
+
+              <div className="p-4 rounded-xl bg-[#0a0c10] border border-slate-800 space-y-1">
+                <div className="text-xs font-bold text-sky-400">Sherpa-ONNX & ASS</div>
+                <div className="text-[11px] text-slate-400">离线 16kHz 旁白合成与逐字跳动字幕生成</div>
+                <div className="text-[10px] text-emerald-400 font-mono">状态: 就绪 (&lt;45MB 极低占用)</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Preview Modal supporting 9:16 smartphone mockup frame */}
       <ClipPlayerModal
@@ -310,7 +442,7 @@ export const App: React.FC = () => {
         isOpen={isInfoModalOpen}
         onClose={() => setIsInfoModalOpen(false)}
       />
-    </div>
+    </AppLayout>
   );
 };
 
