@@ -1,3 +1,6 @@
+pub mod bgm;
+pub use bgm::BgmType;
+
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use serde::{Deserialize, Serialize};

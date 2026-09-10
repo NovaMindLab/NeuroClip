@@ -1,5 +1,7 @@
 pub mod extractor;
 pub mod pipeline;
+pub mod ass;
+pub mod hwaccel;
 
 use std::path::{Path, PathBuf};
 use std::process::Command;

@@ -24,7 +24,14 @@ export const App: React.FC = () => {
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
   const [isPlayerModalOpen, setIsPlayerModalOpen] = useState(false);
 
-  // Mock initial highlight candidates based on multimodal fusion
+  // New states for Phase 2 & 3: 9:16 Aspect ratio, Personas, BGM, and Folder Watcher
+  const [isVertical, setIsVertical] = useState(true); // 默认 9:16 竖屏模式
+  const [currentPersona, setCurrentPersona] = useState("esports");
+  const [currentBgm, setCurrentBgm] = useState("trap");
+  const [hwEncoderName, setHwEncoderName] = useState("VideoToolbox (硬件加速)");
+  const [isWatcherActive, setIsWatcherActive] = useState(false);
+
+  // Initial highlight candidates based on multimodal fusion
   const [highlights, setHighlights] = useState<HighlightItem[]>([
     {
       id: 1,
@@ -65,16 +72,26 @@ export const App: React.FC = () => {
   ]);
 
   const [selectedHighlightId, setSelectedHighlightId] = useState<number>(1);
-
-  // Simulated RMS curve for visualization (180s video)
   const [rmsCurve, setRmsCurve] = useState<[number, number][]>([]);
 
   useEffect(() => {
+    // Probe hardware encoder and status
+    (async () => {
+      try {
+        const { invoke } = await import("@tauri-apps/api/core");
+        const status = await invoke<any>("get_system_status");
+        if (status?.hw_encoder) {
+          setHwEncoderName(status.hw_encoder);
+        }
+      } catch {
+        // Fallback in web/dev preview
+      }
+    })();
+
     // Generate dynamic RMS waveform points
     const points: [number, number][] = [];
     for (let t = 0; t <= 180; t += 1.2) {
       let r = 0.05 + Math.sin(t * 0.2) * 0.02;
-      // Surges around highlights
       if (t >= 16 && t <= 38) r += 0.35 * Math.abs(Math.sin(t * 0.8));
       if (t >= 70 && t <= 96) r += 0.28 * Math.abs(Math.cos(t * 0.6));
       if (t >= 124 && t <= 144) r += 0.24 * Math.abs(Math.sin(t * 0.9));
@@ -88,44 +105,44 @@ export const App: React.FC = () => {
   // Commentary data for selected highlight
   const [commentaryMap, setCommentaryMap] = useState<Record<number, CommentaryData>>({
     1: {
-      hook: "注意看！就在这千钧一发的瞬间！",
+      hook: "千万别眨眼！这波决胜神级操作直接把全场看傻了！",
       full_commentary:
-        "注意看！就在这千钧一发的瞬间！这场精彩对决突然发力，以不可思议的绝妙节奏瞬间扭转战局，行云流水般的掌控力让全场观众集体起立狂欢！不得不说，这一刻的精彩注定成为经典回放！",
+        "千万别眨眼！这波决胜神级操作直接把全场看傻了！行云流水的极限走位，每一个技能都精准卡在毫厘之间，伤害瞬间拉满，全场观众集体起立陷入狂欢，这波操作直接封神！现场瞬间彻底沸腾！",
       duration_seconds: 25.0,
-      char_count: 105,
+      char_count: 125,
       subtitles: [
-        { start_sec: 0.0, end_sec: 3.0, text: "注意看！就在这千钧一发的瞬间" },
-        { start_sec: 3.0, end_sec: 8.5, text: "这场精彩对决突然发力" },
-        { start_sec: 8.5, end_sec: 14.2, text: "以不可思议的绝妙节奏瞬间扭转战局" },
-        { start_sec: 14.2, end_sec: 19.8, text: "行云流水般的掌控力让全场观众集体起立狂欢" },
-        { start_sec: 19.8, end_sec: 25.0, text: "不得不说，这一刻的精彩注定成为经典回放" },
+        { start_sec: 0.0, end_sec: 3.0, text: "千万别眨眼！这波决胜神级操作直接把全场看傻了" },
+        { start_sec: 3.0, end_sec: 8.5, text: "行云流水的极限走位" },
+        { start_sec: 8.5, end_sec: 14.2, text: "每一个技能都精准卡在毫厘之间" },
+        { start_sec: 14.2, end_sec: 19.8, text: "伤害瞬间拉满，全场观众集体起立陷入狂欢" },
+        { start_sec: 19.8, end_sec: 25.0, text: "这波操作直接封神！现场彻底沸腾" },
       ],
     },
     2: {
-      hook: "千万别眨眼！这波操作堪称神级名场面！",
+      hook: "注意看！谁能想到原本死局的对线，竟埋下了惊天伏笔！",
       full_commentary:
-        "千万别眨眼！这波操作堪称神级名场面！选手展现出顶级的反应与爆发力，每一个细节都拿捏得恰到好处，堪称教科书级别的巅峰演绎！现场气氛直接拉满！这绝对是不可多得的高光时刻！",
+        "注意看！谁能想到原本死局的对线，竟埋下了惊天伏笔！就在所有人都以为局势已定时，关键细节悄然逆转，呼吸之间胜负彻底颠覆，让人不得不倒吸一口凉气！这绝对是不可多得的名场面！",
       duration_seconds: 30.0,
-      char_count: 126,
+      char_count: 114,
       subtitles: [
-        { start_sec: 0.0, end_sec: 3.0, text: "千万别眨眼！这波操作堪称神级名场面" },
-        { start_sec: 3.0, end_sec: 11.2, text: "选手展现出顶级的反应与爆发力" },
-        { start_sec: 11.2, end_sec: 18.5, text: "每一个细节都拿捏得恰到好处" },
-        { start_sec: 18.5, end_sec: 24.2, text: "堪称教科书级别的巅峰演绎" },
-        { start_sec: 24.2, end_sec: 30.0, text: "现场气氛直接拉满，不可多得的高光时刻" },
+        { start_sec: 0.0, end_sec: 3.0, text: "注意看！谁能想到原本死局的对线，竟埋下惊天伏笔" },
+        { start_sec: 3.0, end_sec: 11.2, text: "就在所有人都以为局势已定时" },
+        { start_sec: 11.2, end_sec: 18.5, text: "关键细节悄然逆转" },
+        { start_sec: 18.5, end_sec: 24.2, text: "呼吸之间胜负彻底颠覆，让人不得不倒吸一口凉气" },
+        { start_sec: 24.2, end_sec: 30.0, text: "这绝对是不可多得的名场面" },
       ],
     },
     3: {
-      hook: "谁能想到！接下来这一幕彻底引爆全场！",
+      hook: "原谅我不厚道地笑了！这波下饭操作直接承包整晚笑点！",
       full_commentary:
-        "谁能想到！接下来这一幕彻底引爆全场！突然上演意料之外的幽默反转，现场气氛直接拉满，这波神来之笔让所有人忍俊不禁！这一刻的精彩注定成为经典回放！",
+        "原谅我不厚道地笑了！这波下饭操作直接承包整晚笑点！本以为是个王者降临，没想到反手就是一个意料之外的神级下饭名场面，现场解说都差点没绷住，简直太魔性了！这一刻注定成为名场面！",
       duration_seconds: 24.0,
-      char_count: 101,
+      char_count: 96,
       subtitles: [
-        { start_sec: 0.0, end_sec: 3.0, text: "谁能想到！接下来这一幕彻底引爆全场" },
-        { start_sec: 3.0, end_sec: 10.5, text: "突然上演意料之外的幽默反转" },
-        { start_sec: 10.5, end_sec: 17.2, text: "这波神来之笔让所有人忍俊不禁" },
-        { start_sec: 17.2, end_sec: 24.0, text: "这一刻的精彩注定成为经典回放" },
+        { start_sec: 0.0, end_sec: 3.0, text: "原谅我不厚道地笑了！这波操作直接承包整晚笑点" },
+        { start_sec: 3.0, end_sec: 10.5, text: "本以为是个王者降临，没想到反手就是一个神级下饭名场面" },
+        { start_sec: 10.5, end_sec: 17.2, text: "现场解说都差点没绷住，简直太魔性了" },
+        { start_sec: 17.2, end_sec: 24.0, text: "不得不说，这一刻注定成为经典名场面" },
       ],
     },
   });
@@ -138,9 +155,8 @@ export const App: React.FC = () => {
     setIsProcessing(true);
     setProgress(0.05);
     setCurrentStep("extracting_audio");
-    setStatusMessage("Step 1: FFmpeg 正在抽离单声道 16kHz WAV 音频...");
+    setStatusMessage("Step 1: FFmpeg 正在抽离单声道 16kHz WAV 音轨...");
 
-    // Try calling Tauri command if available
     try {
       const { invoke } = await import("@tauri-apps/api/core");
       const { listen } = await import("@tauri-apps/api/event");
@@ -153,6 +169,9 @@ export const App: React.FC = () => {
 
       const res = await invoke<any>("start_auto_clip", {
         videoPath: selectedVideoPath,
+        isVertical916: isVertical,
+        persona: currentPersona,
+        bgm: currentBgm,
       });
 
       if (res?.highlights) {
@@ -163,11 +182,11 @@ export const App: React.FC = () => {
     } catch {
       // Browser / Dev mock simulation runner
       const steps = [
-        { step: "extracting_audio", p: 0.2, msg: "Step 1: 抽离 16kHz 单声道 WAV + 抽帧采样完成" },
-        { step: "analyzing_highlights", p: 0.45, msg: "Step 2: 滑窗 RMS >2.5x 爆点挖掘 + YAMNet 情绪识别 + TransNetV2 镜头吸附完成" },
-        { step: "generating_commentary", p: 0.65, msg: "Step 3: 前3秒黄金Hook锁定，4.2字/秒 对齐文案生成完成" },
-        { step: "synthesizing_tts", p: 0.85, msg: "Step 4: Sherpa-ONNX 离线合成 16kHz voiceover.wav 旁白音轨完成" },
-        { step: "rendering_video", p: 1.0, msg: "Step 5: sidechaincompress 闪避下压 12dB + subtitles 硬字幕压制完成！" },
+        { step: "extracting_audio", p: 0.18, msg: "Step 1: 抽离 16kHz 单声道 WAV + 抽帧采样完成" },
+        { step: "analyzing_highlights", p: 0.42, msg: "Step 2: RMS >2.5x 爆点挖掘 + YAMNet 情绪识别 + TransNetV2 镜头吸附完成" },
+        { step: "generating_commentary", p: 0.62, msg: `Step 3: 调用${currentPersona}流派：黄金Hook锁定，字数严格对齐完成` },
+        { step: "synthesizing_tts", p: 0.80, msg: "Step 4: 离线合成 16kHz WAV 旁白 + 生成 ASS 逐字跳动动效字幕完成" },
+        { step: "rendering_video", p: 1.0, msg: `Step 5: ${isVertical ? "9:16 竖屏动态模糊" : "16:9 原画"} + BGM 混音卡点 + 硬件加速压制完成！` },
       ];
 
       for (const s of steps) {
@@ -179,6 +198,20 @@ export const App: React.FC = () => {
       setHighlights((prev) => [...prev]);
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  const handleToggleWatcher = async () => {
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      const active = await invoke<boolean>("toggle_folder_watcher", {
+        watchDir: "./watch_input",
+        outputDir: "./neuroclip_exports",
+        isVertical,
+      });
+      setIsWatcherActive(active);
+    } catch {
+      setIsWatcherActive(!isWatcherActive);
     }
   };
 
@@ -195,15 +228,18 @@ export const App: React.FC = () => {
 
   return (
     <div className="flex flex-col h-screen bg-[#0a0c10] text-slate-100 overflow-hidden font-sans">
-      {/* Top Navbar */}
+      {/* Top Navbar with Hardware Status & Watcher Toggle */}
       <Navbar
         ffmpegReady={true}
+        hwEncoderName={hwEncoderName}
+        isWatcherActive={isWatcherActive}
+        onToggleWatcher={handleToggleWatcher}
         onOpenInfoModal={() => setIsInfoModalOpen(true)}
       />
 
       {/* Main Workspace Scroll Area */}
       <main className="flex-1 overflow-y-auto p-6 space-y-5">
-        {/* Top Dropzone */}
+        {/* Top Dropzone with 9:16 vs 16:9 Switcher */}
         <VideoDropzone
           selectedVideoPath={selectedVideoPath}
           selectedVideoName={selectedVideoName}
@@ -213,6 +249,8 @@ export const App: React.FC = () => {
           }}
           isProcessing={isProcessing}
           onStartProcess={handleStartProcess}
+          isVertical={isVertical}
+          onToggleAspect={(v) => setIsVertical(v)}
         />
 
         {/* 5-Step Pipeline Stepper */}
@@ -247,19 +285,24 @@ export const App: React.FC = () => {
               onPreviewTts={() => {}}
               onRegenerate={() => {}}
               onOpenPlayer={() => setIsPlayerModalOpen(true)}
+              currentPersona={currentPersona}
+              onChangePersona={(p) => setCurrentPersona(p)}
+              currentBgm={currentBgm}
+              onChangeBgm={(b) => setCurrentBgm(b)}
             />
           </div>
         </div>
       </main>
 
-      {/* Preview Modal */}
+      {/* Preview Modal supporting 9:16 smartphone mockup frame */}
       <ClipPlayerModal
         isOpen={isPlayerModalOpen}
         onClose={() => setIsPlayerModalOpen(false)}
-        clipTitle={`高光片段 #${selectedHighlight.id} - ${selectedHighlight.emotion_tags.join(" + ")}`}
+        clipTitle={`高光切片 #${selectedHighlight.id} - ${selectedHighlight.emotion_tags.join(" + ")}`}
         duration={selectedHighlight.duration}
         commentary={currentCommentary}
-        videoPath={`/neuroclip_exports/neuroclip_highlight_${selectedHighlight.id}.mp4`}
+        videoPath={`/neuroclip_exports/neuroclip_${isVertical ? "9x16_vertical" : "16x9"}_${selectedHighlight.id}.mp4`}
+        isVertical={isVertical}
       />
 
       {/* Architecture Modal */}
