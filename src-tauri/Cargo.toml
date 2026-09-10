@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "NeuroClip: AI Desktop Automated Long Video Highlight Clipping & Smart Commentary System"
 authors = ["NovaMindLab"]
 edition = "2021"
+default-run = "neuroclip"
 
 [lib]
 name = "neuroclip_lib"
