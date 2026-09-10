@@ -28,3 +28,11 @@ tempfile = "3.10"
 
 [features]
 default = []
+
+[[bin]]
+name = "neuroclip"
+path = "src/main.rs"
+
+[[bin]]
+name = "neuroclip-cli"
+path = "src/bin/cli.rs"

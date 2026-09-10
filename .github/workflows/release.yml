@@ -4,9 +4,63 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '发布版本号 (例如: v0.1.1)'
+        required: true
+        default: 'v0.1.1'
+        type: string
+      release_title:
+        description: 'Release 标题'
+        required: false
+        default: 'NeuroClip 智能高光切片与解说系统'
+        type: string
+      draft:
+        description: '是否保存为草稿 (Draft Release)'
+        required: false
+        default: false
+        type: boolean
+      prerelease:
+        description: '是否标记为预发布 (Pre-release)'
+        required: false
+        default: false
+        type: boolean
 
 jobs:
-  release:
+  tag-creation:
+    name: 🏷️ 自动化创建并同步远端 Git 标签
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      release_tag: ${{ steps.set_tag.outputs.tag }}
+    steps:
+      - name: 检出仓库代码
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 确定发布版本标签
+        id: set_tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ inputs.version }}"
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            if ! git rev-parse "$TAG" >/dev/null 2>&1; then
+              git tag -a "$TAG" -m "Release $TAG via GitHub Actions"
+              git push origin "$TAG"
+            fi
+            echo "tag=$TAG" >> $GITHUB_OUTPUT
+          else
+            echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          fi
+
+  build-and-release:
+    name: 📦 跨平台构建与发布 Release (${{ matrix.platform }})
+    needs: tag-creation
+    runs-on: ${{ matrix.platform }}
     permissions:
       contents: write
     strategy:
@@ -15,44 +69,72 @@ jobs:
         include:
           - platform: 'macos-latest'
             args: '--target aarch64-apple-darwin'
+            cli_binary: 'src-tauri/target/aarch64-apple-darwin/release/neuroclip-cli'
+            asset_name: 'neuroclip-cli-macos-arm64'
           - platform: 'ubuntu-22.04'
             args: ''
+            cli_binary: 'src-tauri/target/release/neuroclip-cli'
+            asset_name: 'neuroclip-cli-linux-x64'
           - platform: 'windows-latest'
             args: ''
+            cli_binary: 'src-tauri/target/release/neuroclip-cli.exe'
+            asset_name: 'neuroclip-cli-windows-x64.exe'
 
-    runs-on: ${{ matrix.platform }}
     steps:
-      - name: Checkout repository
+      - name: 检出代码
         uses: actions/checkout@v4
 
-      - name: Install dependencies (Ubuntu only)
+      - name: 安装 Linux 系统图形与音视频依赖
         if: matrix.platform == 'ubuntu-22.04'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev ffmpeg
 
-      - name: Setup Node.js
+      - name: 配置 Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: 'npm'
 
-      - name: Setup Rust
+      - name: 配置 Rust 编译环境
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin' || '' }}
 
-      - name: Install frontend dependencies
+      - name: 安装前端依赖
         run: npm ci
 
-      - name: Build and Publish Tauri App
+      - name: 构建前端静态文件
+        run: npm run build
+
+      - name: 编译跨平台独立 CLI 命令行执行程序
+        run: |
+          cd src-tauri
+          if [ "${{ matrix.platform }}" = "macos-latest" ]; then
+            cargo build --release --bin neuroclip-cli --target aarch64-apple-darwin
+          else
+            cargo build --release --bin neuroclip-cli
+          fi
+          cd ..
+
+      - name: 运行 Tauri Action 打包桌面端应用并发布 Release
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: 'NeuroClip ${{ github.ref_name }}'
-          releaseBody: 'See the release assets for downloadable binaries.'
-          releaseDraft: false
-          prerelease: false
+          tagName: ${{ needs.tag-creation.outputs.release_tag }}
+          releaseName: 'NeuroClip ${{ needs.tag-creation.outputs.release_tag }}'
+          releaseBody: |
+            ## 🌟 NeuroClip 桌面端与云端执行引擎更新发布
+            
+            ### ✨ 包含产物:
+            - **桌面端完整客户端**：低内存常驻、带暗黑流光与可视化声学能量波形图。
+            - **无头端 CLI 工具**：可在任何云服务器或 Docker/CI 环境独立无渲染运行。
+            
+            ### 🛠️ 核心功能:
+            - **多模态高光决策**：RMS 滑窗能量突变 (>2.5x) + YAMNet 情绪标签 + TransNetV2 镜头转场吸附。
+            - **智能快节奏解说**：前 3 秒黄金 Hook，严格按 4.2 字/秒对齐。
+            - **工业级侧链混音**：`sidechaincompress` 解说出声自动压低原音 12dB + 硬字幕烧录。
+          releaseDraft: ${{ inputs.draft || false }}
+          prerelease: ${{ inputs.prerelease || false }}
           args: ${{ matrix.args }}

@@ -1,0 +1,106 @@
+name: Run NeuroClip Pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      video_url:
+        description: '输入长视频的网络下载 URL (若留空则自动生成 60s 真实合成测试视频)'
+        required: false
+        default: ''
+        type: string
+      topic:
+        description: '解说词主题提示 (Topic Hint)'
+        required: false
+        default: '电竞高能决胜名场面'
+        type: string
+      max_clips:
+        description: '最大输出高光短视频切片数量 (1~3)'
+        required: false
+        default: '3'
+        type: choice
+        options:
+          - '1'
+          - '2'
+          - '3'
+
+jobs:
+  execute-pipeline:
+    name: 🎬 GitHub 端执行高光切片与解说合成
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出仓库代码
+        uses: actions/checkout@v4
+
+      - name: 安装系统依赖与 FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg curl
+
+      - name: 验证 FFmpeg 版本
+        run: ffmpeg -version | head -n 2
+
+      - name: 配置 Rust 编译环境
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: 缓存 Cargo 依赖
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            src-tauri/target/
+          key: ${{ runner.os }}-cargo-cli-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-cli-
+
+      - name: 运行 NeuroClip 云端端侧五阶段流水线
+        id: run_pipeline
+        run: |
+          mkdir -p ./neuroclip_exports
+          CLI_ARGS="-o ./neuroclip_exports -t '${{ inputs.topic }}' -n ${{ inputs.max_clips }}"
+          
+          if [ -n "${{ inputs.video_url }}" ]; then
+            CLI_ARGS="$CLI_ARGS -i '${{ inputs.video_url }}'"
+          fi
+
+          echo "执行命令: cargo run --bin neuroclip-cli --release -- $CLI_ARGS"
+          cd src-tauri
+          cargo run --bin neuroclip-cli --release -- $CLI_ARGS
+          cd ..
+
+      - name: 生成 GitHub Job 总结报告
+        if: always()
+        run: |
+          echo "## 🎬 NeuroClip 云端流水线执行报告" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **解说主题**: \`${{ inputs.topic }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **切片上限**: \`${{ inputs.max_clips }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ -f "./neuroclip_exports/pipeline_results.json" ]; then
+            echo "### 🏆 高光切片分析与产物清单" >> $GITHUB_STEP_SUMMARY
+            echo "| 高光 ID | 起止时段 | 时长 | 能量突增 | 综合评分 | 前 3 秒黄金 Hook |" >> $GITHUB_STEP_SUMMARY
+            echo "| :---: | :---: | :---: | :---: | :---: | :--- |" >> $GITHUB_STEP_SUMMARY
+            
+            # 使用 python 解析 json 渲染 Markdown 表格
+            python3 -c "
+          import json
+          with open('./neuroclip_exports/pipeline_results.json') as f:
+              data = json.load(f)
+          for item in data:
+              print(f\"| #{item['highlight_id']} | {item['start_time']:.1f}s - {item['end_time']:.1f}s | {item['duration']:.1f}s | {item['burst_ratio']:.1f}x | {item['score']*100:.0f}分 | **{item['hook']}** |\")
+          " >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: 打包上传产物 (高光短视频 MP4 / 旁白 WAV / 硬字幕 SRT)
+        uses: actions/upload-artifact@v4
+        with:
+          name: neuroclip-highlight-clips
+          path: |
+            neuroclip_exports/*.mp4
+            neuroclip_exports/*.wav
+            neuroclip_exports/*.srt
+            neuroclip_exports/*.json
+          retention-days: 14
