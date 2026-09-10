@@ -103,3 +103,25 @@ npm run build
 ```bash
 npm run tauri dev
 ```
+
+---
+
+## 六、 GitHub 云端执行与版本发布
+
+无需在本地配置繁重的音视频环境，NeuroClip 支持在 **GitHub 端完成全部执行与发布**：
+
+### 1. 🎬 在 GitHub 端直接执行高光切片流水线 (无需本地 GPU/FFmpeg)
+1. 访问 GitHub 仓库 Actions：[Run NeuroClip Pipeline](https://github.com/NovaMindLab/NeuroClip/actions/workflows/run-pipeline.yml)
+2. 点击右上角 **"Run workflow"**：
+   - 可输入目标视频的网络下载 URL（或留空，GitHub 将自动生成 60s 测试视频）。
+   - 输入解说词主题提示（例如：`电竞高能决胜名场面`）。
+   - 选择切片数量（1~3 个）。
+3. 运行完毕后，GitHub Actions 将直接在 **Job Summary** 中展示分析评分表与前 3 秒 Hook，并在下方提供打包的 `neuroclip-highlight-clips` 产物供一键下载（包含高光短视频 MP4、旁白 WAV、硬字幕 SRT 与 JSON）。
+
+### 2. 📦 在 GitHub 端一键打包并发布 Release
+1. 访问 GitHub 仓库 Actions：[Release](https://github.com/NovaMindLab/NeuroClip/actions/workflows/release.yml)
+2. 点击右上角 **"Run workflow"**：
+   - 输入版本号（如 `v0.1.1`）。
+   - 点击确认执行。
+3. GitHub Actions 将自动在云端为 **macOS (Apple Silicon / Intel)、Windows、Ubuntu Linux** 全平台编译打包，自动打上 Git Tag 并直接发布到 GitHub Releases！
+
