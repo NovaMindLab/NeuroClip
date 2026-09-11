@@ -8,8 +8,9 @@ import { CommentaryStudio, CommentaryData } from "./components/CommentaryStudio"
 import { ClipPlayerModal } from "./components/ClipPlayerModal";
 import { ArchitectureModal } from "./components/ArchitectureModal";
 import { MediaLibraryView } from "./components/media-library/MediaLibraryView";
+import { SettingsView } from "./components/settings/SettingsView";
 import { AppNavTab, MediaAssetItem } from "./types/library";
-import { Eye, FolderGit2, CheckCircle2, Zap, HardDrive, Sparkles } from "lucide-react";
+import { Eye, FolderGit2, HardDrive, Sparkles } from "lucide-react";
 
 export const App: React.FC = () => {
   // Navigation layout state
@@ -381,49 +382,9 @@ export const App: React.FC = () => {
         </div>
       )}
 
-      {/* 视图 4：系统与硬件配置 (Settings) */}
+      {/* 视图 4：系统配置与在线升级中心 (Settings) */}
       {activeTab === "settings" && (
-        <div className="space-y-6 max-w-[1200px] mx-auto pb-10">
-          <div className="p-6 rounded-2xl bg-[#121622] border border-[#1e2433] shadow-xl space-y-4">
-            <h2 className="text-sm font-bold text-white flex items-center gap-2">
-              <Zap className="w-4 h-4 text-amber-400" />
-              <span>硬件编解码加速环境</span>
-            </h2>
-            <div className="p-4 rounded-xl bg-[#0a0c10] border border-slate-800 flex items-center justify-between">
-              <div>
-                <div className="text-xs font-bold text-slate-200">{hwEncoderName}</div>
-                <div className="text-[11px] text-slate-400 mt-0.5">自适应嗅探 Apple Silicon VideoToolbox / NVIDIA NVENC / Intel QSV</div>
-              </div>
-              <span className="px-2.5 py-1 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-500/30 text-[11px] font-mono">
-                ACTIVE
-              </span>
-            </div>
-
-            <h2 className="text-sm font-bold text-white flex items-center gap-2 pt-4">
-              <CheckCircle2 className="w-4 h-4 text-cyan-400" />
-              <span>端侧轻量多模态引擎体系</span>
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="p-4 rounded-xl bg-[#0a0c10] border border-slate-800 space-y-1">
-                <div className="text-xs font-bold text-cyan-400">TransNetV2</div>
-                <div className="text-[11px] text-slate-400">镜头边缘智能吸附 (3.0s 黄金半径)</div>
-                <div className="text-[10px] text-emerald-400 font-mono">状态: 就绪 (0ms 延迟)</div>
-              </div>
-
-              <div className="p-4 rounded-xl bg-[#0a0c10] border border-slate-800 space-y-1">
-                <div className="text-xs font-bold text-purple-400">YAMNet & RMS</div>
-                <div className="text-[11px] text-slate-400">分贝突增 2.5x 爆点挖掘与情绪声效分类</div>
-                <div className="text-[10px] text-emerald-400 font-mono">状态: 就绪 (纯 Rust 滑窗)</div>
-              </div>
-
-              <div className="p-4 rounded-xl bg-[#0a0c10] border border-slate-800 space-y-1">
-                <div className="text-xs font-bold text-sky-400">Sherpa-ONNX & ASS</div>
-                <div className="text-[11px] text-slate-400">离线 16kHz 旁白合成与逐字跳动字幕生成</div>
-                <div className="text-[10px] text-emerald-400 font-mono">状态: 就绪 (&lt;45MB 极低占用)</div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <SettingsView hwEncoderName={hwEncoderName} />
       )}
 
       {/* Preview Modal supporting 9:16 smartphone mockup frame */}

@@ -21,6 +21,9 @@ pub fn run() {
             commands::get_library_metrics,
             commands::probe_video_asset,
             commands::delete_video_asset,
+            commands::check_app_update,
+            commands::download_app_update,
+            commands::install_app_update,
         ])
         .run(tauri::generate_context!())
         .expect("运行 NeuroClip Tauri 应用发生错误");
