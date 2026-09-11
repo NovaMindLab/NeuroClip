@@ -1,4 +1,4 @@
-name: CI
+name: CI (跨平台持续集成构建与测试)
 
 on:
   push:
@@ -7,28 +7,65 @@ on:
     branches: [ main ]
 
 jobs:
-  test:
-    runs-on: macos-latest
+  matrix-test:
+    name: 🧪 测试与编译 (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform_name: Windows x64
+          - os: macos-latest
+            platform_name: macOS Apple Silicon
+          - os: ubuntu-22.04
+            platform_name: Linux x64
+
+    defaults:
+      run:
+        shell: bash
+
     steps:
-      - name: Checkout repository
+      - name: 检出仓库代码
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: 安装 Linux 系统图形与音视频依赖
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev ffmpeg
+
+      - name: 配置 Node.js 环境
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: 'npm'
 
-      - name: Setup Rust
+      - name: 配置 Rust 编译工具链
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Install dependencies
+      - name: 安装前端依赖
         run: npm ci
 
-      - name: Build frontend
+      - name: 构建前端静态资源 (TypeScript 校验 + Vite 构建)
         run: npm run build
 
-      - name: Run Rust tests
+      - name: 运行 Rust 核心单元测试套件
         run: |
           cd src-tauri
           cargo test --verbose
+          cd ..
+
+      - name: 编译跨平台独立 CLI 命令行程序
+        run: |
+          cd src-tauri
+          cargo build --release --bin neuroclip-cli
+          cd ..
+
+      - name: 验证二进制生成状态 (${{ matrix.platform_name }})
+        run: |
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            ls -la src-tauri/target/release/neuroclip-cli.exe
+          else
+            ls -la src-tauri/target/release/neuroclip-cli
+          fi

@@ -4,8 +4,9 @@ use crate::ffmpeg::FFmpegContext;
 #[derive(Debug, Clone, PartialEq)]
 pub enum HardwareEncoder {
     VideoToolbox, // macOS (Apple Silicon / Intel)
-    Nvenc,        // NVIDIA GPU
-    Qsv,          // Intel QuickSync
+    Nvenc,        // NVIDIA GPU (Windows / Linux)
+    Qsv,          // Intel QuickSync (Windows / Linux)
+    Amf,          // AMD Radeon GPU (Windows / Linux)
     CpuLibx264,   // 软件编码通用保底
 }
 
@@ -15,6 +16,7 @@ impl HardwareEncoder {
             HardwareEncoder::VideoToolbox => "h264_videotoolbox",
             HardwareEncoder::Nvenc => "h264_nvenc",
             HardwareEncoder::Qsv => "h264_qsv",
+            HardwareEncoder::Amf => "h264_amf",
             HardwareEncoder::CpuLibx264 => "libx264",
         }
     }
@@ -44,6 +46,13 @@ impl HardwareEncoder {
                 "-b:v".to_string(), "6500k".to_string(),
                 "-pix_fmt".to_string(), "nv12".to_string(),
             ],
+            HardwareEncoder::Amf => vec![
+                "-c:v".to_string(), "h264_amf".to_string(),
+                "-quality".to_string(), "speed".to_string(),
+                "-rc".to_string(), "vbr_latency".to_string(),
+                "-b:v".to_string(), "6500k".to_string(),
+                "-pix_fmt".to_string(), "yuv420p".to_string(),
+            ],
             HardwareEncoder::CpuLibx264 => vec![
                 "-c:v".to_string(), "libx264".to_string(),
                 "-preset".to_string(), "fast".to_string(),
@@ -72,7 +81,12 @@ impl HardwareEncoder {
                 return HardwareEncoder::Nvenc;
             }
 
-            // 3. Intel 探测 QSV
+            // 3. AMD Radeon 探测 AMF
+            if s.contains("h264_amf") {
+                return HardwareEncoder::Amf;
+            }
+
+            // 4. Intel 探测 QSV
             if s.contains("h264_qsv") {
                 return HardwareEncoder::Qsv;
             }

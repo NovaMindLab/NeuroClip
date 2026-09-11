@@ -1,4 +1,4 @@
-name: Release
+name: Release (跨平台自动构建打包与多端发布)
 
 on:
   push:
@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: '发布版本号 (例如: v0.1.1)'
+        description: '发布版本号 (例如: v0.3.0)'
         required: true
-        default: 'v0.1.1'
+        default: 'v0.3.0'
         type: string
       release_title:
         description: 'Release 标题'
@@ -58,7 +58,7 @@ jobs:
           fi
 
   build-and-release:
-    name: 📦 跨平台构建与发布 Release (${{ matrix.platform }})
+    name: 📦 跨平台构建与发布 Release (${{ matrix.platform_name }})
     needs: tag-creation
     runs-on: ${{ matrix.platform }}
     permissions:
@@ -67,18 +67,25 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - platform: 'windows-latest'
+            platform_name: 'Windows x64'
+            args: ''
+            cli_binary: 'src-tauri/target/release/neuroclip-cli.exe'
+            asset_name: 'neuroclip-cli-windows-x64.exe'
           - platform: 'macos-latest'
+            platform_name: 'macOS Apple Silicon'
             args: '--target aarch64-apple-darwin'
             cli_binary: 'src-tauri/target/aarch64-apple-darwin/release/neuroclip-cli'
             asset_name: 'neuroclip-cli-macos-arm64'
           - platform: 'ubuntu-22.04'
+            platform_name: 'Linux x64'
             args: ''
             cli_binary: 'src-tauri/target/release/neuroclip-cli'
             asset_name: 'neuroclip-cli-linux-x64'
-          - platform: 'windows-latest'
-            args: ''
-            cli_binary: 'src-tauri/target/release/neuroclip-cli.exe'
-            asset_name: 'neuroclip-cli-windows-x64.exe'
+
+    defaults:
+      run:
+        shell: bash
 
     steps:
       - name: 检出代码
@@ -125,16 +132,33 @@ jobs:
           tagName: ${{ needs.tag-creation.outputs.release_tag }}
           releaseName: 'NeuroClip ${{ needs.tag-creation.outputs.release_tag }}'
           releaseBody: |
-            ## 🌟 NeuroClip 桌面端与云端执行引擎更新发布
+            ## 🌟 NeuroClip 桌面端与云端执行引擎更新发布 (${{ needs.tag-creation.outputs.release_tag }})
             
             ### ✨ 包含产物:
-            - **桌面端完整客户端**：低内存常驻、带暗黑流光与可视化声学能量波形图。
-            - **无头端 CLI 工具**：可在任何云服务器或 Docker/CI 环境独立无渲染运行。
+            - **Windows 桌面端安装包**：`.msi` / `.exe` (NSIS) 安装程序，原生支持 Windows 10/11 x64。
+            - **macOS 桌面端安装包**：`.dmg` / `.app`，针对 Apple Silicon 原生优化。
+            - **Linux 桌面端安装包**：`.deb` / `.AppImage`。
+            - **跨平台独立 CLI 工具**：可在任何本地机器、云服务器或 CI 环境独立无头运行。
             
             ### 🛠️ 核心功能:
-            - **多模态高光决策**：RMS 滑窗能量突变 (>2.5x) + YAMNet 情绪标签 + TransNetV2 镜头转场吸附。
-            - **智能快节奏解说**：前 3 秒黄金 Hook，严格按 4.2 字/秒对齐。
-            - **工业级侧链混音**：`sidechaincompress` 解说出声自动压低原音 12dB + 硬字幕烧录。
+            - **左右双栏现代工作台**：高光剪辑工作台 + PC 本地视频资产库 + 无人值守监听 + 硬件设置。
+            - **PC 视频极速扫描入库**：基于 SQLite3 (WAL 模式)，深度剪枝防卡死，单事务万级毫秒入库。
+            - **短视频工业化重构**：9:16 动态高斯模糊虚化背景，逐字跳动高亮动效 ASS 字幕。
+            - **三轨侧链闪避混音**：人声出声自动下潜原片环境音 -12dB 与背景 BGM -15dB。
+            - **硬件编解码加速**：自适应激活 Apple VideoToolbox、NVIDIA NVENC、AMD AMF 与 Intel QSV。
           releaseDraft: ${{ inputs.draft || false }}
           prerelease: ${{ inputs.prerelease || false }}
           args: ${{ matrix.args }}
+
+      - name: 上传独立 CLI 命令行程序至 GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          CLI_PATH="${{ matrix.cli_binary }}"
+          ASSET_NAME="${{ matrix.asset_name }}"
+          if [ -f "$CLI_PATH" ]; then
+            echo "正在上传 $CLI_PATH 为 $ASSET_NAME 到版本 ${{ needs.tag-creation.outputs.release_tag }}..."
+            gh release upload "${{ needs.tag-creation.outputs.release_tag }}" "$CLI_PATH#$ASSET_NAME" --clobber || true
+          else
+            echo "警告: 未找到 CLI 二进制文件: $CLI_PATH"
+          fi

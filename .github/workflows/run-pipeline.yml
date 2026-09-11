@@ -3,6 +3,15 @@ name: Run NeuroClip Pipeline
 on:
   workflow_dispatch:
     inputs:
+      runner_os:
+        description: '执行运行环境 (Runner OS)'
+        required: false
+        default: 'ubuntu-latest'
+        type: choice
+        options:
+          - 'ubuntu-latest'
+          - 'windows-latest'
+          - 'macos-latest'
       video_url:
         description: '输入长视频的网络下载 URL (若留空则自动生成 60s 真实合成测试视频)'
         required: false
@@ -25,16 +34,33 @@ on:
 
 jobs:
   execute-pipeline:
-    name: 🎬 GitHub 端执行高光切片与解说合成
-    runs-on: ubuntu-latest
+    name: 🎬 云端执行高光切片与解说 (${{ inputs.runner_os || 'ubuntu-latest' }})
+    runs-on: ${{ inputs.runner_os || 'ubuntu-latest' }}
+    defaults:
+      run:
+        shell: bash
+
     steps:
       - name: 检出仓库代码
         uses: actions/checkout@v4
 
-      - name: 安装系统依赖与 FFmpeg
+      - name: 安装 Linux 系统依赖与 FFmpeg
+        if: (inputs.runner_os || 'ubuntu-latest') == 'ubuntu-22.04' || (inputs.runner_os || 'ubuntu-latest') == 'ubuntu-latest'
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg curl
+
+      - name: 安装 macOS FFmpeg
+        if: (inputs.runner_os || 'ubuntu-latest') == 'macos-latest'
+        run: |
+          brew install ffmpeg
+
+      - name: 检查并配置 Windows FFmpeg
+        if: (inputs.runner_os || 'ubuntu-latest') == 'windows-latest'
+        run: |
+          if ! command -v ffmpeg &>/dev/null; then
+            choco install ffmpeg -y
+          fi
 
       - name: 验证 FFmpeg 版本
         run: ffmpeg -version | head -n 2
@@ -42,20 +68,7 @@ jobs:
       - name: 配置 Rust 编译环境
         uses: dtolnay/rust-toolchain@stable
 
-      - name: 缓存 Cargo 依赖
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            src-tauri/target/
-          key: ${{ runner.os }}-cargo-cli-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-cli-
-
-      - name: 运行 NeuroClip 云端端侧五阶段流水线
+      - name: 运行 NeuroClip 五阶段全自动切片流水线
         id: run_pipeline
         run: |
           mkdir -p ./neuroclip_exports
@@ -73,7 +86,7 @@ jobs:
       - name: 生成 GitHub Job 总结报告
         if: always()
         run: |
-          echo "## 🎬 NeuroClip 云端流水线执行报告" >> $GITHUB_STEP_SUMMARY
+          echo "## 🎬 NeuroClip 云端流水线执行报告 (${{ inputs.runner_os || 'ubuntu-latest' }})" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- **解说主题**: \`${{ inputs.topic }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- **切片上限**: \`${{ inputs.max_clips }}\`" >> $GITHUB_STEP_SUMMARY
@@ -84,7 +97,6 @@ jobs:
             echo "| 高光 ID | 起止时段 | 时长 | 能量突增 | 综合评分 | 前 3 秒黄金 Hook |" >> $GITHUB_STEP_SUMMARY
             echo "| :---: | :---: | :---: | :---: | :---: | :--- |" >> $GITHUB_STEP_SUMMARY
             
-            # 使用 python 解析 json 渲染 Markdown 表格
             python3 -c "
           import json
           with open('./neuroclip_exports/pipeline_results.json') as f:
@@ -99,8 +111,9 @@ jobs:
         with:
           name: neuroclip-highlight-clips
           path: |
-            neuroclip_exports/*.mp4
-            neuroclip_exports/*.wav
-            neuroclip_exports/*.srt
-            neuroclip_exports/*.json
-          retention-days: 14
+            ./neuroclip_exports/*.mp4
+            ./neuroclip_exports/*.wav
+            ./neuroclip_exports/*.srt
+            ./neuroclip_exports/*.ass
+            ./neuroclip_exports/pipeline_results.json
+          retention-days: 7
