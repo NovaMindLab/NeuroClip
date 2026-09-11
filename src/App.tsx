@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense, lazy } from "react";
 import { AppLayout } from "./components/layout/AppLayout";
 import { VideoDropzone } from "./components/VideoDropzone";
 import { PipelineStepper } from "./components/PipelineStepper";
@@ -7,10 +7,28 @@ import { HighlightList, HighlightItem } from "./components/HighlightList";
 import { CommentaryStudio, CommentaryData } from "./components/CommentaryStudio";
 import { ClipPlayerModal } from "./components/ClipPlayerModal";
 import { ArchitectureModal } from "./components/ArchitectureModal";
-import { MediaLibraryView } from "./components/media-library/MediaLibraryView";
-import { SettingsView } from "./components/settings/SettingsView";
 import { AppNavTab, MediaAssetItem } from "./types/library";
 import { Eye, FolderGit2, HardDrive, Sparkles } from "lucide-react";
+
+// 次屏重量级视图动态代码切片懒加载，大幅提升首屏加载速度
+const MediaLibraryView = lazy(() =>
+  import("./components/media-library/MediaLibraryView").then((m) => ({ default: m.MediaLibraryView }))
+);
+const SettingsView = lazy(() =>
+  import("./components/settings/SettingsView").then((m) => ({ default: m.SettingsView }))
+);
+
+function generateInitialRmsCurve(): [number, number][] {
+  const points: [number, number][] = [];
+  for (let t = 0; t <= 180; t += 1.2) {
+    let r = 0.05 + Math.sin(t * 0.2) * 0.02;
+    if (t >= 16 && t <= 38) r += 0.35 * Math.abs(Math.sin(t * 0.8));
+    if (t >= 70 && t <= 96) r += 0.28 * Math.abs(Math.cos(t * 0.6));
+    if (t >= 124 && t <= 144) r += 0.24 * Math.abs(Math.sin(t * 0.9));
+    points.push([t, r]);
+  }
+  return points;
+}
 
 export const App: React.FC = () => {
   // Navigation layout state
@@ -81,10 +99,10 @@ export const App: React.FC = () => {
   ]);
 
   const [selectedHighlightId, setSelectedHighlightId] = useState<number>(1);
-  const [rmsCurve, setRmsCurve] = useState<[number, number][]>([]);
+  const [rmsCurve] = useState<[number, number][]>(generateInitialRmsCurve);
 
   useEffect(() => {
-    // Probe hardware encoder and status
+    // 毫秒级探测硬件加速与系统状态 (Fast-Path 内存读取)
     (async () => {
       try {
         const { invoke } = await import("@tauri-apps/api/core");
@@ -96,17 +114,6 @@ export const App: React.FC = () => {
         // Fallback in web preview
       }
     })();
-
-    // Generate dynamic RMS waveform points
-    const points: [number, number][] = [];
-    for (let t = 0; t <= 180; t += 1.2) {
-      let r = 0.05 + Math.sin(t * 0.2) * 0.02;
-      if (t >= 16 && t <= 38) r += 0.35 * Math.abs(Math.sin(t * 0.8));
-      if (t >= 70 && t <= 96) r += 0.28 * Math.abs(Math.cos(t * 0.6));
-      if (t >= 124 && t <= 144) r += 0.24 * Math.abs(Math.sin(t * 0.9));
-      points.push([t, r]);
-    }
-    setRmsCurve(points);
   }, []);
 
   const selectedHighlight = highlights.find((h) => h.id === selectedHighlightId) || highlights[0];
@@ -326,10 +333,12 @@ export const App: React.FC = () => {
 
       {/* 视图 2：PC 本地视频资产库 (Media Library) */}
       {activeTab === "library" && (
-        <MediaLibraryView
-          onLoadIntoStudio={handleLoadAssetIntoStudio}
-          onUpdateCount={setLibraryCount}
-        />
+        <Suspense fallback={<div className="p-8 text-center text-slate-500 font-mono text-xs">正在载入媒体库引擎...</div>}>
+          <MediaLibraryView
+            onLoadIntoStudio={handleLoadAssetIntoStudio}
+            onUpdateCount={setLibraryCount}
+          />
+        </Suspense>
       )}
 
       {/* 视图 3：无人值守监听中台 (Watcher) */}
@@ -384,7 +393,9 @@ export const App: React.FC = () => {
 
       {/* 视图 4：系统配置与在线升级中心 (Settings) */}
       {activeTab === "settings" && (
-        <SettingsView hwEncoderName={hwEncoderName} />
+        <Suspense fallback={<div className="p-8 text-center text-slate-500 font-mono text-xs">正在载入系统配置与更新向导...</div>}>
+          <SettingsView hwEncoderName={hwEncoderName} />
+        </Suspense>
       )}
 
       {/* Preview Modal supporting 9:16 smartphone mockup frame */}

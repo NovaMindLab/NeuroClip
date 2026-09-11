@@ -55,8 +55,14 @@ pub struct SystemStatusInfo {
     pub ready: bool,
 }
 
+static SYSTEM_STATUS_CACHE: std::sync::OnceLock<SystemStatusInfo> = std::sync::OnceLock::new();
+
 #[tauri::command]
 pub fn get_system_status() -> Result<SystemStatusInfo, String> {
+    if let Some(cached) = SYSTEM_STATUS_CACHE.get() {
+        return Ok(cached.clone());
+    }
+
     let (ffmpeg_avail, ffmpeg_path, hw_enc) = match FFmpegContext::discover() {
         Ok(ctx) => {
             let enc = HardwareEncoder::probe(&ctx);
@@ -65,13 +71,16 @@ pub fn get_system_status() -> Result<SystemStatusInfo, String> {
         Err(_) => (false, None, "CPU libx264".to_string()),
     };
 
-    Ok(SystemStatusInfo {
+    let status = SystemStatusInfo {
         ffmpeg_available: ffmpeg_avail,
         ffmpeg_path,
         tts_engine: "Sherpa-ONNX / Built-in Acoustic Engine".to_string(),
         hw_encoder: hw_enc,
         ready: true,
-    })
+    };
+
+    let _ = SYSTEM_STATUS_CACHE.set(status.clone());
+    Ok(status)
 }
 
 #[tauri::command]

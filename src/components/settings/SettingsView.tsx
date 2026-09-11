@@ -175,7 +175,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ hwEncoderName }) => 
               <div className="flex items-center gap-2">
                 <h2 className="text-base font-bold text-white">客户端在线升级与自动安装</h2>
                 <span className="px-2 py-0.5 rounded-full bg-cyan-950 border border-cyan-500/40 text-cyan-300 font-mono text-[11px] font-semibold">
-                  v0.3.1
+                  {updateInfo?.current_version ? `v${updateInfo.current_version}` : "v0.4.0"}
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
@@ -264,9 +264,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ hwEncoderName }) => 
 
             {/* 安装状态反馈 */}
             {installStatus && (
-              <div className="p-3 rounded-xl bg-cyan-950/70 border border-cyan-500/40 text-xs text-cyan-200 flex items-center gap-2">
-                <PackageCheck className="w-4 h-4 text-cyan-400 shrink-0" />
-                <span>{installStatus}</span>
+              <div className="p-3.5 rounded-xl bg-cyan-950/70 border border-cyan-500/40 text-xs text-cyan-200 flex items-start gap-2.5">
+                <PackageCheck className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <div className="font-semibold text-cyan-100">{installStatus}</div>
+                  <div className="text-[11px] text-cyan-300/70 leading-relaxed">
+                    💡 Windows 升级机制保障：为避免安装程序遇到文件写锁冲突，主进程将在拉起安装器后平滑退出。若触发 SmartScreen 提示，只需点击「更多信息」→「仍要运行」即可。
+                  </div>
+                </div>
               </div>
             )}
 

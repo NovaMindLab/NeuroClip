@@ -1,6 +1,6 @@
 [package]
 name = "neuroclip"
-version = "0.3.0"
+version = "1.0.0"
 description = "NeuroClip: AI Desktop Automated Long Video Highlight Clipping & Smart Commentary System"
 authors = ["NovaMindLab"]
 edition = "2021"

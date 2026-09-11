@@ -313,7 +313,15 @@ pub fn install_app_update(file_path: String) -> Result<String, String> {
             .args(["/C", "start", "", &file_path])
             .spawn()
             .map_err(|e| format!("无法启动 Windows 安装程序: {}", e))?;
-        Ok("已启动 Windows 安装向导".to_string())
+
+        // 核心关键：Windows 下运行中的 .exe 会被操作系统内核独占写锁 (ERROR_SHARING_VIOLATION)。
+        // 延迟 1.5 秒后安全退出当前旧进程，确保安装程序能够无障碍覆盖写入。
+        std::thread::spawn(|| {
+            std::thread::sleep(std::time::Duration::from_millis(1500));
+            std::process::exit(0);
+        });
+
+        Ok("已启动 Windows 安装向导，当前程序将在 1.5 秒后自动退出以完成覆盖升级！".to_string())
     }
 
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]

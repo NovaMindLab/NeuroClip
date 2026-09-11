@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/nice-registry/tauri-schema/main/schemas/v2/tauri.conf.json",
   "productName": "NeuroClip",
-  "version": "0.3.0",
+  "version": "1.0.0",
   "identifier": "com.novamind.neuroclip",
   "build": {
     "beforeDevCommand": "npm run dev",
