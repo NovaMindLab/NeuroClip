@@ -178,4 +178,64 @@ fn test_scanner_filter_pruning_and_whitelist() {
     assert!(!ScanFilter::is_supported_video_format(Path::new("photo.jpg")));
     assert!(!ScanFilter::is_supported_video_format(Path::new("music.mp3")));
     assert!(!ScanFilter::is_supported_video_format(Path::new("document.pdf")));
+
+    // 核心安全测试：TypeScript 代码文件绝不被识别为视频
+    assert!(!ScanFilter::is_supported_video_format(Path::new("index.ts")));
+    assert!(!ScanFilter::is_supported_video_format(Path::new("types.d.ts")));
+    assert!(!ScanFilter::is_supported_video_format(Path::new("vite.config.ts")));
+    assert!(!ScanFilter::is_supported_video_format(Path::new("App.test.ts")));
+
+    // 创建真实的临时 TypeScript 代码文件进行内容级校验
+    let temp_dir = tempfile::tempdir().unwrap();
+    let ts_file_path = temp_dir.path().join("service.ts");
+    std::fs::write(&ts_file_path, b"import React from 'react';\nexport const Api = () => {};").unwrap();
+    assert!(!ScanFilter::is_supported_video_format(&ts_file_path));
+
+    // 创建真实的合法 MPEG-TS 视频二进制包（带 0x47 同步字节）进行正向识别测试
+    let valid_ts_path = temp_dir.path().join("broadcast.ts");
+    let mut ts_bytes = vec![0u8; 564];
+    ts_bytes[0] = 0x47;
+    ts_bytes[188] = 0x47;
+    ts_bytes[376] = 0x47;
+    std::fs::write(&valid_ts_path, ts_bytes).unwrap();
+    assert!(ScanFilter::is_supported_video_format(&valid_ts_path));
+}
+
+#[test]
+fn test_cleanup_invalid_typescript_assets() {
+    let tmp = tempfile::tempdir().unwrap();
+    let db_path = tmp.path().join("test_cleanup.db");
+    let mgr = DatabaseManager::new(&db_path).unwrap();
+
+    // 模拟历史扫描误插入了一条 TypeScript 源码文件
+    let fake_ts_path = tmp.path().join("index.ts");
+    std::fs::write(&fake_ts_path, b"import { useState } from 'react';").unwrap();
+
+    let items = vec![
+        VideoAssetRow {
+            id: 0,
+            file_path: fake_ts_path.to_string_lossy().to_string(),
+            file_name: "index.ts".to_string(),
+            file_size: 34,
+            duration: 0.0,
+            width: 0,
+            height: 0,
+            format: "ts".to_string(),
+            created_at: 1700000000,
+            modified_at: 1700000000,
+            scanned_at: 1700000000,
+            status: "discovered".to_string(),
+        },
+    ];
+    mgr.bulk_upsert_assets(&items).unwrap();
+
+    let (total_before, _) = mgr.query_assets(1, 10, None, None, None).unwrap();
+    assert_eq!(total_before, 1);
+
+    // 执行清洗函数
+    let cleaned = mgr.cleanup_invalid_assets().unwrap();
+    assert_eq!(cleaned, 1);
+
+    let (total_after, _) = mgr.query_assets(1, 10, None, None, None).unwrap();
+    assert_eq!(total_after, 0);
 }

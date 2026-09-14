@@ -221,14 +221,11 @@ impl FolderWatcher {
             if let Ok(Ok(event)) = rx.recv_timeout(Duration::from_millis(500)) {
                 if let notify::EventKind::Create(_) | notify::EventKind::Modify(_) = event.kind {
                     for p in event.paths {
-                        if let Some(ext) = p.extension().and_then(|s| s.to_str()) {
-                            let ext_lower = ext.to_lowercase();
-                            if ["mp4", "mkv", "mov", "flv", "ts"].contains(&ext_lower.as_str()) {
-                                // 启动防抖落盘校验
-                                if Self::is_file_fully_written(&p, 30) {
-                                    if let Ok(outputs) = Self::process_single_video(&p, &config_clone, &ffmpeg_ctx) {
-                                        on_processed(&p, &outputs);
-                                    }
+                        if crate::scanner::filter::ScanFilter::is_supported_video_format(&p) {
+                            // 启动防抖落盘校验
+                            if Self::is_file_fully_written(&p, 30) {
+                                if let Ok(outputs) = Self::process_single_video(&p, &config_clone, &ffmpeg_ctx) {
+                                    on_processed(&p, &outputs);
                                 }
                             }
                         }

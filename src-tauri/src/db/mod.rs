@@ -47,6 +47,7 @@ impl DatabaseManager {
             db_path: db_path.to_path_buf(),
         };
         mgr.init_schema()?;
+        let _ = mgr.cleanup_invalid_assets();
         Ok(mgr)
     }
 
@@ -307,5 +308,44 @@ impl DatabaseManager {
         conn.execute("DELETE FROM video_assets WHERE id = ?1", params![id])
             .map_err(|e| format!("删除视频记录失败: {}", e))?;
         Ok(())
+    }
+
+    /// 自动清洗并删除历史扫描中误入库的非视频文件（如误将 TypeScript 源码当成 MPEG-TS）
+    pub fn cleanup_invalid_assets(&self) -> Result<usize, String> {
+        let conn = self.get_connection()?;
+        let mut stmt = conn
+            .prepare("SELECT id, file_path, format FROM video_assets WHERE LOWER(format) IN ('ts', 'm2ts', 'mts')")
+            .map_err(|e| format!("准备清理查询失败: {}", e))?;
+
+        let rows = stmt
+            .query_map([], |row| {
+                let id: i64 = row.get(0)?;
+                let file_path: String = row.get(1)?;
+                let format: String = row.get(2)?;
+                Ok((id, file_path, format))
+            })
+            .map_err(|e| format!("查询待清洗记录失败: {}", e))?;
+
+        let mut ids_to_delete = Vec::new();
+        for r in rows.flatten() {
+            let (id, file_path, _) = r;
+            let path = Path::new(&file_path);
+            if !path.exists() || !crate::scanner::filter::ScanFilter::is_valid_mpeg_ts(path) {
+                ids_to_delete.push(id);
+            }
+        }
+
+        if !ids_to_delete.is_empty() {
+            let tx = conn
+                .unchecked_transaction()
+                .map_err(|e| format!("开启清理事务失败: {}", e))?;
+            for id in &ids_to_delete {
+                let _ = tx.execute("DELETE FROM video_assets WHERE id = ?1", params![id]);
+            }
+            tx.commit().map_err(|e| format!("提交清理事务失败: {}", e))?;
+            println!("[Database] 已自动清理 {} 条误入库的 TypeScript 源码记录", ids_to_delete.len());
+        }
+
+        Ok(ids_to_delete.len())
     }
 }

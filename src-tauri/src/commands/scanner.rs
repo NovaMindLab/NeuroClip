@@ -75,6 +75,9 @@ pub async fn start_video_scan(
     let app_clone = app.clone();
 
     tokio::task::spawn_blocking(move || {
+        // 扫描前先执行一次脏数据清洗，彻底剔除历史误入库的 TypeScript 等非视频项
+        let _ = get_db().cleanup_invalid_assets();
+
         let res = scanner.scan_directories(target_paths, {
             let app_inner = app_clone.clone();
             move |batch_cnt, total_cnt, current_dir| {
